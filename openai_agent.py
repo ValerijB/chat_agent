@@ -2,7 +2,7 @@ import os
 from typing import TypedDict
 from agents import Agent, ModelSettings, OpenAIChatCompletionsModel, Runner, function_tool, set_tracing_disabled
 from openai import AsyncOpenAI
-import httpx
+from duckduckgo_search import DDGS
 
 @function_tool
 async def duckduckgo_search(query: str) -> str:
@@ -11,11 +11,30 @@ async def duckduckgo_search(query: str) -> str:
     Args:
         query: The search query string.
     """
-    async with httpx.AsyncClient() as client:
-        response = await client.get(f"https://duckduckgo.com/html/?q={query}")
-        if response.status_code == 200:
-            return f"Search results found for '{query}' (HTML length: {len(response.text)} characters)."
-        return f"Failed to search DuckDuckGo for '{query}'."
+    try:
+        # Initialize DuckDuckGo search
+        ddg = DDGS()
+        
+        # Get search results (limited to 5 for better performance)
+        results = ddg.text(query, max_results=5)
+        
+        if not results:
+            return f"No search results found for '{query}'."
+        
+        # Format the results
+        formatted_results = []
+        for i, result in enumerate(results, 1):
+            title = result.get('title', 'No title')
+            snippet = result.get('body', 'No description available')
+            url = result.get('href', '')
+            
+            formatted_results.append(f"{i}. **{title}**\n   {snippet}\n   URL: {url}\n")
+        
+        search_summary = f"DuckDuckGo search results for '{query}':\n\n" + "\n".join(formatted_results)
+        return search_summary
+        
+    except Exception as e:
+        return f"Error searching DuckDuckGo for '{query}': {str(e)}"
 
 # Settings
 token = os.getenv('SECRET')
